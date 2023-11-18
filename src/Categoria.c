@@ -78,7 +78,6 @@ Categoria *categoria_nueva_desde_archivo(const char *nombre,
       palabra[caracteres - 1] = 0;
     }
     categoria_registrar_palabra(nueva, palabra, palabra_size);
-    free(palabra);
   }
 
   fclose(stream);

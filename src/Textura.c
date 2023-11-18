@@ -17,25 +17,25 @@ void textura_agregar_linea(Textura *, const char *, size_t);
 
 void textura_realloc(Textura *self)
 {
-  size_t nueva_altura;
+  size_t nuevo_buffer_size;
   char **nuevo;
   return_if_fail(self != NULL);
-  nueva_altura = self->altura + BUFFER_DEFAULT;
-  nuevo = calloc(nueva_altura, sizeof(char *));
+  nuevo_buffer_size = self->buffer_size + BUFFER_DEFAULT;
+  nuevo = calloc(nuevo_buffer_size, sizeof(char *));
 
   for (size_t i = 0; i < self->altura; i++) {
     nuevo[i] = self->datos[i];
   }
   free(self->datos);
   self->datos = nuevo;
-  self->buffer_size = nueva_altura;
+  self->buffer_size = nuevo_buffer_size;
 }
 
 Textura *textura_nueva_desde_archivo(const char *camino)
 {
   FILE *stream = NULL;
-  char *linea;
-  size_t caracteres, size;
+  char *linea = NULL;
+  size_t caracteres = 0, size = 0;
   Textura *self = NULL;
   return_val_if_fail(camino != NULL, NULL);
 
@@ -54,7 +54,7 @@ Textura *textura_nueva_desde_archivo(const char *camino)
       self->rowstride = caracteres;
     }
 
-    if (linea[caracteres - 1] == '\n') {
+    if (caracteres > 0 && linea[caracteres - 1] == '\n') {
       linea[caracteres - 1] = 0;
     }
     textura_agregar_linea(self, linea, caracteres);
