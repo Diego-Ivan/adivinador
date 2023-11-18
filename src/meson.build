@@ -3,6 +3,7 @@ adivinador_sources = [
   'Categoria.c',
   'Textura.c',
   'Recursos.c',
+  'Juego.c',
 ]
 
 adivinador_deps = [

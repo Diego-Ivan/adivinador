@@ -5,9 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "Categoria.h"
-#include "Macros.h"
-#include "Textura.h"
+#include "Juego.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -17,11 +15,14 @@
 int main(int argc,
          char **argv)
 {
-  Textura *textura = textura_nueva_desde_archivo("recursos/corazon.txt");
-  if (textura == NULL) {
-    printf("No se pudo abrir la textura");
+  Juego *juego = juego_nuevo();
+  if (juego == NULL) {
+    printf ("No se ha podido iniciar el juego\n");
     return EXIT_FAILURE;
   }
-  textura_imprimir(textura);
+  juego_registrar_categoria(juego,
+                            categoria_nueva_desde_archivo("Animales",
+                                                          "recursos/animales.txt"));
+  juego_empezar (juego);
   return EXIT_SUCCESS;
 }
