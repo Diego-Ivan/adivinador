@@ -14,7 +14,8 @@ typedef enum {
 
 Juego *juego_nuevo(void);
 void juego_registrar_categoria(Juego *, Categoria *);
-void juego_empezar(Juego *);
+void juego_iniciar_bucle(Juego *);
+void juego_liberar(Juego *);
 
 int juego_get_vidas(Juego *);
 

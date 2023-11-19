@@ -23,6 +23,7 @@ int main(int argc,
   juego_registrar_categoria(juego,
                             categoria_nueva_desde_archivo("Animales",
                                                           "recursos/animales.txt"));
-  juego_empezar (juego);
+  juego_iniciar_bucle (juego);
+  juego_liberar(juego);
   return EXIT_SUCCESS;
 }
