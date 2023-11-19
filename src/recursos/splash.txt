@@ -1,5 +1,4 @@
-    .aMMMb  dMP dMP .aMMMb  dMMMMb  .aMMMb  .aMMMb  dMMMMb  .aMMMb
-   dMP"dMP dMP dMP dMP"dMP dMP.dMP dMP"VMP dMP"dMP dMP VMP dMP"dMP
-  dMMMMMP dMMMMMP dMP dMP dMMMMK" dMP     dMMMMMP dMP dMP dMP dMP
- dMP dMP dMP dMP dMP.aMP dMP"AMF dMP.aMP dMP dMP dMP.aMP dMP.aMP
-dMP dMP dMP dMP  VMMMP" dMP dMP  VMMMP" dMP dMP dMMMMP"  VMMMP"
+ _______ _____ _______ ___ ___ _______ _______ _______ _____  _______ ______
+|   _   |     \_     _|   |   |_     _|    |  |   _   |     \|       |   __ \
+|       |  --  ||   |_|   |   |_|   |_|       |       |  --  |   -   |      <
+|___|___|_____/_______|\_____/|_______|__|____|___|___|_____/|_______|___|__|

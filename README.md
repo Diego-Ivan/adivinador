@@ -1,3 +1,3 @@
-# adivinador
+# Adivinador
 
-A description of this project.
+Un pequeño juego en CLI para adivinar una palabra de varias categorías. 
