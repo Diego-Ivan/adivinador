@@ -10,14 +10,23 @@
 #define DEFAULT_VIDAS 4
 #define DEFAULT_N_CATEGORIAS 12
 
+typedef enum {
+  TIPO_0,
+  TIPO_CARACTER,
+  TIPO_PALABRA,
+  N_TIPOS
+} TipoIntento;
+char *tipo_intento_to_string(TipoIntento);
+
 void juego_realloc_categorias(Juego *);
 void juego_solicitar_categoria(Juego *);
 void juego_iniciar_adivinanzas(Juego *);
-bool juego_revelar_caracter(Juego *, char);
+bool juego_revelar_caracter(Juego *, int);
+TipoIntento juego_solicitar_tipo_intento(void);
 void juego_imprimir_menu(Juego *);
 void juego_imprimir_partida(Juego *);
 void juego_elegir_palabra(Juego *);
-char char_minuscula(char);
+int char_minuscula(int);
 bool juego_preguntar_continuar(Juego *);
 
 struct __Juego {
@@ -109,10 +118,12 @@ void juego_iniciar_bucle(Juego *self)
     clear_pantalla();
     juego_iniciar_adivinanzas (self);
 
+    clear_pantalla ();
     if (self->adivinado) {
       textura_imprimir (self->victoria_textura);
     } else {
       textura_imprimir (self->derrota_textura);
+      printf ("La palabra era: %s\n", self->palabra_actual);
     }
   } while(juego_preguntar_continuar (self));
 }
@@ -149,41 +160,80 @@ void juego_elegir_palabra(Juego *self)
 
 void juego_iniciar_adivinanzas(Juego *self)
 {
-  char c = 0;
-  bool intento_exitoso = false;
+  char c = 0, str[100];
+  TipoIntento tipo_intento;
   return_if_fail(self != NULL);
   do {
     clear_pantalla ();
     juego_imprimir_partida (self);
 
-    printf ("Ingrese un caracter para revelar: ");
-    scanf(" %c", &c);
+    tipo_intento = juego_solicitar_tipo_intento ();
+    switch(tipo_intento)
+    {
+    case TIPO_PALABRA:
+      printf ("Ingrese la palabra: ");
+      scanf("%99s", str);
 
-    intento_exitoso = juego_revelar_caracter (self, c);
-    if (intento_exitoso) {
-      self->adivinado = strcmp(self->palabra_actual,
-                               self->palabra_adivinada) == 0;
-    } else {
-      self->vidas--;
+      self->adivinado = strcasecmp (self->palabra_actual, str) == 0;
+      if (!self->adivinado) {
+        self->vidas--;
+      }
+      break;
+    case TIPO_CARACTER:
+      printf ("Ingrese el caracter: ");
+      scanf(" %99s", str);
+      if (juego_revelar_caracter (self, str[0])) {
+        self->adivinado = strcasecmp (self->palabra_actual,
+                                      self->palabra_adivinada) == 0;
+      } else {
+        self->vidas--;
+      }
+      break;
+    case TIPO_0:
+    case N_TIPOS:
+    default:
+      break;
     }
   }while(self->vidas > 0 && !self->adivinado);
 }
 
-bool juego_revelar_caracter(Juego *self, char c)
+TipoIntento juego_solicitar_tipo_intento(void)
+{
+  int seleccion = 0;
+  for (;;)
+  {
+    printf ("Ingrese el tipo de intento que quiere realizar:\n");
+    for (TipoIntento tipo = TIPO_0 + 1; tipo < N_TIPOS; tipo++) {
+      printf ("%d. %s\n", tipo, tipo_intento_to_string (tipo));
+    }
+    scanf ("%d", &seleccion);
+    if (seleccion > TIPO_0 && seleccion < N_TIPOS)
+      break;
+    printf ("Opción Inválida!\n");
+  }
+  return (TipoIntento)seleccion;
+}
+
+bool juego_revelar_caracter(Juego *self, int c)
 {
   bool valido = false;
+  int actual_c, adivinado_c;
   return_val_if_fail (self != NULL, false);
+
+  c = char_minuscula(c);
   for (size_t i = 0; self->palabra_actual[i] != 0; i++)
   {
+    actual_c = char_minuscula (self->palabra_actual[i]);
+    adivinado_c = char_minuscula (self->palabra_adivinada[i]);
     // Significa que el usuario ya ha adivinado esta letra
-    if (c == self->palabra_adivinada[i])
+    if (c == adivinado_c)
     {
       valido = false;
       break;
     }
-    if (c == self->palabra_actual[i])
+    if (c == actual_c)
     {
-      self->palabra_adivinada[i] = c;
+      self->palabra_adivinada[i] = self->palabra_actual[i];
       valido = true;
     }
   }
@@ -306,7 +356,21 @@ void juego_liberar(Juego *self)
   free(self);
 }
 
-char char_minuscula(char c)
+char *tipo_intento_to_string(TipoIntento tipo)
+{
+  switch(tipo){
+  case TIPO_PALABRA:
+    return "Adivinar Palabra";
+  case TIPO_CARACTER:
+    return "Adivinar Carácter";
+  case TIPO_0:
+  case N_TIPOS:
+  default:
+    return NULL;
+  }
+}
+
+int char_minuscula(int c)
 {
   if (c >= 65 && c <= 90) {
     return c + 32;
