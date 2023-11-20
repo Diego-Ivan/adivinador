@@ -16,7 +16,7 @@ typedef enum {
   TIPO_PALABRA,
   N_TIPOS
 } TipoIntento;
-char *tipo_intento_to_string(TipoIntento);
+const char *tipo_intento_to_string(TipoIntento);
 
 void juego_realloc_categorias(Juego *);
 void juego_solicitar_categoria(Juego *);
@@ -160,7 +160,7 @@ void juego_elegir_palabra(Juego *self)
 
 void juego_iniciar_adivinanzas(Juego *self)
 {
-  char c = 0, str[100];
+  char str[100];
   TipoIntento tipo_intento;
   return_if_fail(self != NULL);
   do {
@@ -356,7 +356,7 @@ void juego_liberar(Juego *self)
   free(self);
 }
 
-char *tipo_intento_to_string(TipoIntento tipo)
+const char *tipo_intento_to_string(TipoIntento tipo)
 {
   switch(tipo){
   case TIPO_PALABRA:
