@@ -10,6 +10,10 @@
 #define DEFAULT_VIDAS 4
 #define DEFAULT_N_CATEGORIAS 12
 
+#define PRIMER_U8(c) ((c & 0xC0) == 0xC0)
+#define PARTE_U8(c) ((c & 0xC0) == 0x80)
+#define ES_ASCII(c) (c >= 0)
+
 typedef enum {
   TIPO_0,
   TIPO_CARACTER,
@@ -21,13 +25,16 @@ const char *tipo_intento_to_string(TipoIntento);
 void juego_realloc_categorias(Juego *);
 void juego_solicitar_categoria(Juego *);
 void juego_iniciar_adivinanzas(Juego *);
-bool juego_revelar_caracter(Juego *, int);
+bool juego_revelar_caracter(Juego *, const char *, size_t);
 TipoIntento juego_solicitar_tipo_intento(void);
 void juego_imprimir_menu(Juego *);
 void juego_imprimir_partida(Juego *);
 void juego_elegir_palabra(Juego *);
+void juego_imprimir_palabra_adivinada (Juego *);
 int char_minuscula(int);
 bool juego_preguntar_continuar(Juego *);
+
+char *u8_construir_primer_caracter(const char *, size_t *);
 
 struct __Juego {
   int vidas;
@@ -39,6 +46,7 @@ struct __Juego {
 
   Categoria *categoria_actual;
   char *palabra_actual;
+  size_t palabra_len;
 
   char *palabra_adivinada;
   bool adivinado;
@@ -61,6 +69,7 @@ Juego *juego_nuevo(void) {
 
   nuevo->categoria_actual = NULL;
   nuevo->palabra_actual = NULL;
+  nuevo->palabra_len = 0;
   nuevo->palabra_adivinada = NULL;
   nuevo->adivinado = false;
 
@@ -139,7 +148,7 @@ void juego_elegir_palabra(Juego *self)
   palabra_indice = rand() % n_palabras;
   palabra_seleccionada = categoria_get_palabra (self->categoria_actual,
                                                 palabra_indice);
-  palabra_len = strlen(palabra_seleccionada);
+  palabra_len = self->palabra_len = strlen(palabra_seleccionada);
 
   if (self->palabra_actual != NULL) {
     free (self->palabra_actual);
@@ -161,6 +170,8 @@ void juego_elegir_palabra(Juego *self)
 void juego_iniciar_adivinanzas(Juego *self)
 {
   char str[100];
+  char *primer_caracter = NULL;
+  size_t c_len = 0;
   TipoIntento tipo_intento;
   return_if_fail(self != NULL);
   do {
@@ -182,12 +193,15 @@ void juego_iniciar_adivinanzas(Juego *self)
     case TIPO_CARACTER:
       printf ("Ingrese el caracter: ");
       scanf(" %99s", str);
-      if (juego_revelar_caracter (self, str[0])) {
+      primer_caracter = u8_construir_primer_caracter (str, &c_len);
+      if (juego_revelar_caracter (self, primer_caracter, c_len)) {
         self->adivinado = strcasecmp (self->palabra_actual,
                                       self->palabra_adivinada) == 0;
       } else {
         self->vidas--;
       }
+      free (primer_caracter);
+      primer_caracter = NULL;
       break;
     case TIPO_0:
     case N_TIPOS:
@@ -214,26 +228,23 @@ TipoIntento juego_solicitar_tipo_intento(void)
   return (TipoIntento)seleccion;
 }
 
-bool juego_revelar_caracter(Juego *self, int c)
+bool juego_revelar_caracter(Juego *self, const char *u8_c, size_t c_len)
 {
   bool valido = false;
-  int actual_c, adivinado_c;
   return_val_if_fail (self != NULL, false);
 
-  c = char_minuscula(c);
-  for (size_t i = 0; self->palabra_actual[i] != 0; i++)
+  for (size_t i = 0; i < self->palabra_len; i++)
   {
-    actual_c = char_minuscula (self->palabra_actual[i]);
-    adivinado_c = char_minuscula (self->palabra_adivinada[i]);
-    // Significa que el usuario ya ha adivinado esta letra
-    if (c == adivinado_c)
+    // Significa que el caracter ya fue adivinado
+    if (strncasecmp (&self->palabra_adivinada[i], u8_c, c_len) == 0)
     {
       valido = false;
       break;
     }
-    if (c == actual_c)
+    // u8_c está en el string
+    if (strncasecmp (&self->palabra_actual[i], u8_c, c_len) == 0)
     {
-      self->palabra_adivinada[i] = self->palabra_actual[i];
+      strncpy (&self->palabra_adivinada[i], &self->palabra_actual[i], c_len);
       valido = true;
     }
   }
@@ -282,7 +293,20 @@ void juego_imprimir_partida(Juego *self)
     putchar('\n');
   }
   printf("\n\n");
-  printf("%s\n", self->palabra_adivinada);
+  juego_imprimir_palabra_adivinada (self);
+}
+
+void juego_imprimir_palabra_adivinada (Juego *self)
+{
+  return_if_fail (self != NULL);
+  for (size_t i = 0; i < self->palabra_len; i++) {
+    char c_adivinado = self->palabra_adivinada[i];
+    char c_actual = self->palabra_actual[i];
+    if ((PRIMER_U8 (c_actual) || ES_ASCII(c_actual)) || PARTE_U8 (c_adivinado)) {
+      putchar (c_adivinado);
+    }
+  }
+  putchar('\n');
 }
 
 bool juego_preguntar_continuar(Juego *self)
@@ -376,4 +400,34 @@ int char_minuscula(int c)
     return c + 32;
   }
   return c;
+}
+
+char *u8_construir_primer_caracter(const char *str, size_t *charlen)
+{
+  char *retval = NULL;
+  return_val_if_fail (str != NULL, NULL);
+  return_val_if_fail (charlen != NULL, NULL);
+
+  *charlen = 0;
+  retval = calloc (strlen (str), sizeof (char *));
+  if (ES_ASCII (str[0]))
+  {
+    retval[0] = str[0];
+    *charlen = 1;
+    return retval;
+  }
+
+  for (; str[*charlen] != 0; (*charlen)++)
+  {
+    char c = str[*charlen];
+    if (PRIMER_U8 (c) || PARTE_U8 (c))
+    {
+      retval[*charlen] = c;
+      continue;
+    }
+    if (ES_ASCII(c))
+        break;
+  }
+
+  return retval;
 }
