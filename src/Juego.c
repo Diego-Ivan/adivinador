@@ -405,11 +405,12 @@ int char_minuscula(int c)
 char *u8_construir_primer_caracter(const char *str, size_t *charlen)
 {
   char *retval = NULL;
+  bool inicio_u8 = 0;
   return_val_if_fail (str != NULL, NULL);
   return_val_if_fail (charlen != NULL, NULL);
 
   *charlen = 0;
-  retval = calloc (strlen (str), sizeof (char *));
+  retval = calloc (strlen (str), sizeof (char));
   if (ES_ASCII (str[0]))
   {
     retval[0] = str[0];
@@ -420,13 +421,24 @@ char *u8_construir_primer_caracter(const char *str, size_t *charlen)
   for (; str[*charlen] != 0; (*charlen)++)
   {
     char c = str[*charlen];
-    if (PRIMER_U8 (c) || PARTE_U8 (c))
+    if (PRIMER_U8 (c))
     {
+      if (inicio_u8) {
+        break;
+      }
+      inicio_u8 = true;
       retval[*charlen] = c;
       continue;
     }
-    if (ES_ASCII(c))
-        break;
+    if (PARTE_U8 (c) && inicio_u8) {
+      retval[*charlen] = c;
+      continue;
+    }
+    if (ES_ASCII (c)) {
+      if (inicio_u8) break;
+      retval[*charlen] = c;
+      break;
+    }
   }
 
   return retval;
