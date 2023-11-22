@@ -1,6 +1,16 @@
+/* Categoria.c
+ *
+ * Copyright 2023 Diego Iván
+ * Copyright 2023 Juan Pablo Alquicer
+ * Copyright 2023 Mariana García
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include "Categoria.h"
 #include "Macros.h"
 #include <malloc.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -116,6 +126,9 @@ void categoria_registrar_palabra(Categoria *self, const char *palabra,
   self->n_palabras++;
 }
 
+/**
+ * Añade espacios al arreglo interno para que puedan haber más palabras
+ */
 void categoria_realloc(Categoria *self) {
   char **anterior, **nuevo;
   size_t anterior_size, nuevo_size;
@@ -143,7 +156,7 @@ void categoria_realloc(Categoria *self) {
  *
  * @indice El índice de la palabra
  *
- * Returns: La palabra @indice de @self ó -1 si @indice no es válido
+ * Returns: (transfer: None) La palabra @indice de @self ó -1 si @indice no es válido
  */
 const char *categoria_get_palabra(Categoria *self, int indice) {
   return_val_if_fail(self != NULL, NULL);
@@ -164,6 +177,13 @@ int categoria_get_n_palabras(Categoria *self) {
   return self->n_palabras;
 }
 
+/**
+ * Obteiene el nombre de @self
+ *
+ * @self La categoría
+ *
+ * Returns: (transfer: none) El nombre de @self
+ */
 const char *categoria_get_nombre(Categoria *self) {
   return_val_if_fail(self != NULL, NULL);
   return self->nombre;
@@ -178,3 +198,4 @@ void categoria_destruir(Categoria *self) {
   free(self->nombre);
   free(self);
 }
+

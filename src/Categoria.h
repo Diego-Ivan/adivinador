@@ -1,12 +1,11 @@
 /* Categoria.h
  *
- * Copyright 2023 Diego Iván <diegoivan.mae@gmail.com>
+ * Copyright 2023 Diego Iván
+ * Copyright 2023 Juan Pablo Alquicer
+ * Copyright 2023 Mariana García
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-
-
-#include <stdio.h>
 
 #ifndef __CATEGORIA_H__
 #define __CATEGORIA_H__
