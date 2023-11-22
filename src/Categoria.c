@@ -40,13 +40,10 @@ void categoria_realloc(Categoria *);
  */
 Categoria *categoria_nueva(const char *nombre) {
   Categoria *nueva;
-  size_t nombre_len;
   return_val_if_fail(nombre != NULL, NULL);
 
-  nombre_len = strlen(nombre);
   nueva = malloc(sizeof(Categoria));
-  nueva->nombre = calloc(nombre_len, sizeof(char));
-  strcpy(nueva->nombre, nombre);
+  nueva->nombre = strdup (nombre);
 
   nueva->palabras = calloc(DEFAULT_N_PALABRAS, sizeof(char *));
   nueva->n_palabras = 0;

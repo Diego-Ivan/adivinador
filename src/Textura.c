@@ -86,7 +86,8 @@ Textura *textura_nueva_desde_archivo(const char *camino)
     }
     textura_agregar_linea(self, linea);
   }
-  free(linea);
+  free (linea);
+  fclose (stream);
 
   return self;
 }
