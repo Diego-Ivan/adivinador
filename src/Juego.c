@@ -201,9 +201,11 @@ void juego_elegir_palabra(Juego *self)
 
   if (self->palabra_actual != NULL) {
     free (self->palabra_actual);
+    self->palabra_actual = NULL;
   }
   if (self->palabra_adivinada != NULL) {
     free(self->palabra_adivinada);
+    self->palabra_adivinada = NULL;
   }
 
   self->palabra_actual = strdup (palabra_seleccionada);
