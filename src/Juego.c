@@ -7,7 +7,7 @@
 #include <string.h>
 #include <time.h>
 
-#define DEFAULT_VIDAS 4
+#define DEFAULT_VIDAS 5
 #define DEFAULT_N_CATEGORIAS 12
 
 #define PRIMER_U8(c) ((c & 0xC0) == 0xC0)
