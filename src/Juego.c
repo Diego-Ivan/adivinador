@@ -152,6 +152,7 @@ void juego_iniciar_bucle(Juego *self)
   clear_pantalla();
 
   do{
+    self->adivinado = false;
     juego_solicitar_categoria (self);
     juego_elegir_palabra (self);
     self->vidas = DEFAULT_VIDAS;
@@ -256,6 +257,7 @@ void juego_iniciar_adivinanzas(Juego *self)
         self->adivinado = strcasecmp (self->palabra_actual,
                                       self->palabra_adivinada) == 0;
       } else {
+        self->adivinado = false;
         self->vidas--;
       }
       free (primer_caracter);
