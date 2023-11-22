@@ -1,3 +1,12 @@
+/* Juego.c
+ *
+ * Copyright 2023 Diego Iván
+ * Copyright 2023 Juan Pablo Alquicer
+ * Copyright 2023 Mariana García
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include "Juego.h"
 #include "Macros.h"
 #include "Textura.h"
@@ -10,10 +19,20 @@
 #define DEFAULT_VIDAS 5
 #define DEFAULT_N_CATEGORIAS 12
 
+/*
+ * Nos ayudará a reconocer caracteres codificados en UTF-8 en vez de ASCII
+ *
+ * Macros implementadas gracias a: https://dev.to/rdentato/utf-8-strings-in-c-1-3-42a4
+ */
 #define PRIMER_U8(c) ((c & 0xC0) == 0xC0)
 #define PARTE_U8(c) ((c & 0xC0) == 0x80)
 #define ES_ASCII(c) (c >= 0)
 
+
+/**
+ * Enumeración que define los tipos de intento que puede realizar el usuario
+ * dentro del rango (TIPO_0, N_TIPOS)
+ */
 typedef enum {
   TIPO_0,
   TIPO_CARACTER,
@@ -32,10 +51,13 @@ void juego_imprimir_partida(Juego *);
 void juego_elegir_palabra(Juego *);
 void juego_imprimir_palabra_adivinada (Juego *);
 int char_minuscula(int);
-bool juego_preguntar_continuar(Juego *);
+bool juego_preguntar_continuar(void);
 
 char *u8_construir_primer_caracter(const char *, size_t *);
 
+/**
+ * Estructura que almacena los datos relacionados al juego
+ */
 struct __Juego {
   int vidas;
   EstadoJuego estado_actual;
@@ -57,6 +79,11 @@ struct __Juego {
   Textura *derrota_textura;
 };
 
+/**
+ * Crea una nueva instancia de un juego
+ *
+ * Returns: Nueva instancia de Juego o NULL en caso de haber fallado
+ */
 Juego *juego_nuevo(void) {
   Juego *nuevo = malloc(sizeof(Juego));
 
@@ -81,6 +108,14 @@ Juego *juego_nuevo(void) {
   return nuevo;
 }
 
+/**
+ * Añade @categoria al listado de categíoras de @self para que pueda ser usada
+ * en rondas
+ *
+ * @self La instancia a la que se le quiera agregar la categoría
+ *
+ * @ categoria: La categoria que se quiera añadir a @self
+ */
 void juego_registrar_categoria(Juego     *self,
                                Categoria *categoria)
 {
@@ -93,6 +128,9 @@ void juego_registrar_categoria(Juego     *self,
   self->n_categorias++;
 }
 
+/**
+ * Procedimiento que aloja más espacio para el listado interno de categorías
+ */
 void juego_realloc_categorias(Juego *self)
 {
   size_t nuevo_size;
@@ -109,6 +147,12 @@ void juego_realloc_categorias(Juego *self)
   self->categorias_buffer_size = nuevo_size;
 }
 
+/**
+ * Inicia el bucle de juego, que termina hasta que el usuario desea terminar
+ * la ejecución del programa
+ *
+ * @self La instancia del juego que se quiera iniciar
+ */
 void juego_iniciar_bucle(Juego *self)
 {
   return_if_fail(self != NULL);
@@ -134,9 +178,14 @@ void juego_iniciar_bucle(Juego *self)
       textura_imprimir (self->derrota_textura);
       printf ("La palabra era: %s\n", self->palabra_actual);
     }
-  } while(juego_preguntar_continuar (self));
+  } while(juego_preguntar_continuar ());
 }
 
+/**
+ * Procedimiento que elije una palabra aleatoria para la categoria actual
+ *
+ * @self La instancia del juego
+ */
 void juego_elegir_palabra(Juego *self)
 {
   const char *palabra_seleccionada = NULL;
@@ -157,16 +206,22 @@ void juego_elegir_palabra(Juego *self)
     free(self->palabra_adivinada);
   }
 
-  self->palabra_actual = calloc (palabra_len, sizeof(char));
+  self->palabra_actual = strdup (palabra_seleccionada);
   self->palabra_adivinada = calloc(palabra_len, sizeof(char));
 
-  strcpy (self->palabra_actual, palabra_seleccionada);
   for (size_t i = 0; palabra_seleccionada[i] != 0; i++) {
     char c = palabra_seleccionada[i] == ' ' ? ' ' : '_';
     self->palabra_adivinada[i] = c;
   }
 }
 
+/**
+ * Procedimiento que inicia el bucle de adivinanzas del usuario, que se
+ * detiene hasta que el usuario haya perdido todas sus vidas o cuando
+ * haya adivinado la palabra correcta
+ *
+ * @self La instancia del juego
+ */
 void juego_iniciar_adivinanzas(Juego *self)
 {
   char str[100];
@@ -193,7 +248,17 @@ void juego_iniciar_adivinanzas(Juego *self)
     case TIPO_CARACTER:
       printf ("Ingrese el caracter: ");
       scanf(" %99s", str);
+
+      /**
+       * Desafortunadamente, no podemos utilizar caracteres ASCII para español,
+       * ya que palabras con acento y la ñ no se revelarán correctamente si es
+       * que el usuario la adivina. Tenemos que utilizar la codificación
+       * UTF-8 de las cadenas en C para que funcione
+       *
+       * https://dev.to/rdentato/utf-8-strings-in-c-1-3-42a4
+       */
       primer_caracter = u8_construir_primer_caracter (str, &c_len);
+
       if (juego_revelar_caracter (self, primer_caracter, c_len)) {
         self->adivinado = strcasecmp (self->palabra_actual,
                                       self->palabra_adivinada) == 0;
@@ -211,6 +276,11 @@ void juego_iniciar_adivinanzas(Juego *self)
   }while(self->vidas > 0 && !self->adivinado);
 }
 
+/**
+ * Función que solicita un tipo de intento al usuario
+ *
+ * Returns: Un tipo de intento válido de la enumeración TipoIntento.
+ */
 TipoIntento juego_solicitar_tipo_intento(void)
 {
   int seleccion = 0;
@@ -228,6 +298,13 @@ TipoIntento juego_solicitar_tipo_intento(void)
   return (TipoIntento)seleccion;
 }
 
+/**
+ * Función que intenta revelar @u8_c en la palabra a adivinar
+ *
+ * @self La instancia del juego
+ * @u8_c Un caracter UTF-8 válido
+ * @c_len La longitud de @u8_c
+ */
 bool juego_revelar_caracter(Juego *self, const char *u8_c, size_t c_len)
 {
   bool valido = false;
@@ -252,6 +329,11 @@ bool juego_revelar_caracter(Juego *self, const char *u8_c, size_t c_len)
   return valido;
 }
 
+/**
+ * Imprime el menú de @self
+ *
+ * @self - La instancia de Juego
+ */
 void juego_imprimir_menu(Juego *self)
 {
   return_if_fail(self != NULL);
@@ -259,6 +341,11 @@ void juego_imprimir_menu(Juego *self)
   printf("\n\n\nPRESIONE ENTER PARA COMENZAR\n\n\n");
 }
 
+/**
+ * Solicita al usuario alguna de las categorías registradas en @self
+ *
+ * @self - La instancia del juego
+ */
 void juego_solicitar_categoria(Juego *self) {
   int seleccion;
   return_if_fail(self != NULL);
@@ -278,6 +365,12 @@ void juego_solicitar_categoria(Juego *self) {
   self->categoria_actual = self->categorias[seleccion - 1];
 }
 
+/**
+ * Imprime el status actual de la partida, con número de vidas y el progreso
+ * para adivinar la palabra
+ *
+ * @self La instancia del juego
+ */
 void juego_imprimir_partida(Juego *self)
 {
   size_t altura_textura;
@@ -296,6 +389,23 @@ void juego_imprimir_partida(Juego *self)
   juego_imprimir_palabra_adivinada (self);
 }
 
+/**
+ * Imprime el progreso del usuario para adivinar la palabra seleccionada
+ * Desfortunadamente, por la codificación de las cadenas en C, no podemos
+ * confiar en solo imprimir los guiones que sustituyen a las letras
+ * pendientes, ya que estas pueden estar codificadas en UTF-8 y por tanto
+ * ocupar más de un caracter. Solo imprimiremos el guión en los siguientes
+ * casos:
+ *
+ * 1. El caracter en la palabra seleccionada es ASCII
+ *
+ * 2. El caracter de la palabra adivinada es ASCII
+ *
+ * 3. El caracter de la palabra adivinada es el primer caracter de un caracter
+ * UTF-8
+ *
+ * 4. El caracter es UTF-8 pero ya fue adivinado por el usuario
+ */
 void juego_imprimir_palabra_adivinada (Juego *self)
 {
   return_if_fail (self != NULL);
@@ -309,11 +419,12 @@ void juego_imprimir_palabra_adivinada (Juego *self)
   putchar('\n');
 }
 
-bool juego_preguntar_continuar(Juego *self)
+/**
+ * Pregunta al usuario si desea continuar jugando
+ */
+bool juego_preguntar_continuar(void)
 {
   char seleccion;
-  return_val_if_fail (self != NULL, false);
-
   for (;;) {
     printf ("¿Desea iniciar una nueva partida? (s/n): ");
     scanf(" %c", &seleccion);
@@ -327,6 +438,11 @@ bool juego_preguntar_continuar(Juego *self)
   return seleccion == 's';
 }
 
+/**
+ * Retorna el número de vidas que tiene el usuario
+ *
+ * @self El número de vidas de @self
+ */
 int juego_get_vidas(Juego *self)
 {
   return_val_if_fail (self != NULL, -1);
@@ -339,6 +455,11 @@ EstadoJuego juego_get_estado(Juego *self)
   return self->estado_actual;
 }
 
+/**
+ * Libera la memoria utilizada por el juego
+ *
+ * @self La instancia que se desea liberar de memoria
+ */
 void juego_liberar(Juego *self)
 {
   return_if_fail(self != NULL);
@@ -380,6 +501,13 @@ void juego_liberar(Juego *self)
   free(self);
 }
 
+/**
+ * Retorna la representación en cadena de caracteres de @tipo
+ *
+ * @tipo El tipo de intento que se quiere convertir a cadena de caracteres
+ *
+ * Returns: (transfer: none) La representación en cadena de caracteres de @tipo
+ */
 const char *tipo_intento_to_string(TipoIntento tipo)
 {
   switch(tipo){
@@ -394,6 +522,13 @@ const char *tipo_intento_to_string(TipoIntento tipo)
   }
 }
 
+/**
+ * Retorna la minuscula de @c
+ *
+ * @c - El caracter que se quiere convertir a minusculas
+ *
+ * Returns: La minuscula de @c, si es que tiene
+ */
 int char_minuscula(int c)
 {
   if (c >= 65 && c <= 90) {
@@ -402,6 +537,25 @@ int char_minuscula(int c)
   return c;
 }
 
+/**
+ * Obtiene el primer caracter en codificación UTF-8 de @str.
+ *
+ * Esta función es necesaria para poder implementar adivinanzas de caracteres
+ * UTF-8, como letras acentudas o la ñ.
+ *
+ * Se utilizó https://dev.to/rdentato/utf-8-strings-in-c-1-3-42a4 como recurso
+ * principal para implementar la función.
+ *
+ * Esta función NO hace validación de ningún tipo, solo retorna el primer
+ * caracter, por lo que se espera que @str sea válido desde un inicio
+ *
+ * @str La cadena de la que se quiere obtener el caracter. Debe ser UTF-8 valida
+ *
+ * @charlen Una dirección de memoria válida a una variable size_t para
+ * almacenar la longitud del primer caracter
+ *
+ * Returns: (transfer: ownership) El primer caracter UTF-8 de @str
+ */
 char *u8_construir_primer_caracter(const char *str, size_t *charlen)
 {
   char *retval = NULL;

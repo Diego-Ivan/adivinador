@@ -1,3 +1,12 @@
+/* Juego.h
+ *
+ * Copyright 2023 Diego Iván
+ * Copyright 2023 Juan Pablo Alquicer
+ * Copyright 2023 Mariana García
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include "Categoria.h"
 
 #ifndef __JUEGO_H__
