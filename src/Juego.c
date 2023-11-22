@@ -240,7 +240,10 @@ void juego_iniciar_adivinanzas(Juego *self)
     {
     case TIPO_PALABRA:
       printf ("Ingrese la palabra: ");
-      scanf("%99s", str);
+      // https://stackoverflow.com/questions/1247989/how-do-you-allow-spaces-to-be-entered-using-scanf
+      // Esta sola línea de código acabó con mi paciencia, y su único propósito
+      // es permitir espacio en scanf...
+      scanf(" %99[^\n]", str);
 
       self->adivinado = strcasecmp (self->palabra_actual, str) == 0;
       if (!self->adivinado) {
