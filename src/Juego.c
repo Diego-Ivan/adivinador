@@ -10,6 +10,7 @@
 #include "Juego.h"
 #include "Macros.h"
 #include "Textura.h"
+#include "Unicode.h"
 #include <malloc.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -18,16 +19,6 @@
 
 #define DEFAULT_VIDAS 5
 #define DEFAULT_N_CATEGORIAS 12
-
-/*
- * Nos ayudará a reconocer caracteres codificados en UTF-8 en vez de ASCII
- *
- * Macros implementadas gracias a: https://dev.to/rdentato/utf-8-strings-in-c-1-3-42a4
- */
-#define PRIMER_U8(c) ((c & 0xC0) == 0xC0)
-#define PARTE_U8(c) ((c & 0xC0) == 0x80)
-#define ES_ASCII(c) (c >= 0)
-
 
 /**
  * Enumeración que define los tipos de intento que puede realizar el usuario
@@ -44,16 +35,13 @@ const char *tipo_intento_to_string(TipoIntento);
 void juego_realloc_categorias(Juego *);
 void juego_solicitar_categoria(Juego *);
 void juego_iniciar_adivinanzas(Juego *);
-bool juego_revelar_caracter(Juego *, const char *, size_t);
+bool juego_revelar_caracter(Juego *, const char *, size_t, bool);
 TipoIntento juego_solicitar_tipo_intento(void);
 void juego_imprimir_menu(Juego *);
 void juego_imprimir_partida(Juego *);
 void juego_elegir_palabra(Juego *);
 void juego_imprimir_palabra_adivinada (Juego *);
-int char_minuscula(int);
 bool juego_preguntar_continuar(void);
-
-char *u8_construir_primer_caracter(const char *, size_t *);
 
 /**
  * Estructura que almacena los datos relacionados al juego
@@ -264,7 +252,7 @@ void juego_iniciar_adivinanzas(Juego *self)
        */
       primer_caracter = u8_construir_primer_caracter (str, &c_len);
 
-      if (juego_revelar_caracter (self, primer_caracter, c_len)) {
+      if (juego_revelar_caracter (self, primer_caracter, c_len, false)) {
         self->adivinado = strcasecmp (self->palabra_actual,
                                       self->palabra_adivinada) == 0;
       } else {
@@ -310,9 +298,14 @@ TipoIntento juego_solicitar_tipo_intento(void)
  * @u8_c Un caracter UTF-8 válido
  * @c_len La longitud de @u8_c
  */
-bool juego_revelar_caracter(Juego *self, const char *u8_c, size_t c_len)
+bool juego_revelar_caracter(Juego      *self,
+                            const char *u8_c,
+                            size_t      c_len,
+                            bool        es_alt)
 {
-  bool valido = false;
+  int valido = false;
+  size_t alt_len;
+  const char *alt;
   return_val_if_fail (self != NULL, false);
 
   for (size_t i = 0; i < self->palabra_len; i++)
@@ -328,6 +321,26 @@ bool juego_revelar_caracter(Juego *self, const char *u8_c, size_t c_len)
     {
       strncpy (&self->palabra_adivinada[i], &self->palabra_actual[i], c_len);
       valido = true;
+    }
+  }
+
+  // Vamos a revelar los caracteres equivalentes, como caracteres cono acento/
+  // sin acento, Ñ...
+  if (!es_alt)
+  {
+    alt = u8_get_caracter_equivalente_minuscula (u8_c, &alt_len);
+    if (alt != NULL) {
+      valido += juego_revelar_caracter (self, alt, alt_len, true);
+    }
+    alt = u8_get_caracter_equivalente_mayuscula (u8_c, &alt_len);
+    if (alt != NULL) {
+      valido += juego_revelar_caracter (self, alt, alt_len, true);
+    }
+    if (!ES_ASCII (u8_c[0])) {
+      alt = u8_get_ascii_equivalente (u8_c);
+      if (alt != NULL) {
+        valido += juego_revelar_caracter (self, alt, 1, true);
+      }
     }
   }
 
@@ -525,80 +538,4 @@ const char *tipo_intento_to_string(TipoIntento tipo)
   default:
     return NULL;
   }
-}
-
-/**
- * Retorna la minuscula de @c
- *
- * @c - El caracter que se quiere convertir a minusculas
- *
- * Returns: La minuscula de @c, si es que tiene
- */
-int char_minuscula(int c)
-{
-  if (c >= 65 && c <= 90) {
-    return c + 32;
-  }
-  return c;
-}
-
-/**
- * Obtiene el primer caracter en codificación UTF-8 de @str.
- *
- * Esta función es necesaria para poder implementar adivinanzas de caracteres
- * UTF-8, como letras acentudas o la ñ.
- *
- * Se utilizó https://dev.to/rdentato/utf-8-strings-in-c-1-3-42a4 como recurso
- * principal para implementar la función.
- *
- * Esta función NO hace validación de ningún tipo, solo retorna el primer
- * caracter, por lo que se espera que @str sea válido desde un inicio
- *
- * @str La cadena de la que se quiere obtener el caracter. Debe ser UTF-8 valida
- *
- * @charlen Una dirección de memoria válida a una variable size_t para
- * almacenar la longitud del primer caracter
- *
- * Returns: (transfer: ownership) El primer caracter UTF-8 de @str
- */
-char *u8_construir_primer_caracter(const char *str, size_t *charlen)
-{
-  char *retval = NULL;
-  bool inicio_u8 = 0;
-  return_val_if_fail (str != NULL, NULL);
-  return_val_if_fail (charlen != NULL, NULL);
-
-  *charlen = 0;
-  retval = calloc (strlen (str), sizeof (char));
-  if (ES_ASCII (str[0]))
-  {
-    retval[0] = str[0];
-    *charlen = 1;
-    return retval;
-  }
-
-  for (; str[*charlen] != 0; (*charlen)++)
-  {
-    char c = str[*charlen];
-    if (PRIMER_U8 (c))
-    {
-      if (inicio_u8) {
-        break;
-      }
-      inicio_u8 = true;
-      retval[*charlen] = c;
-      continue;
-    }
-    if (PARTE_U8 (c) && inicio_u8) {
-      retval[*charlen] = c;
-      continue;
-    }
-    if (ES_ASCII (c)) {
-      if (inicio_u8) break;
-      retval[*charlen] = c;
-      break;
-    }
-  }
-
-  return retval;
 }

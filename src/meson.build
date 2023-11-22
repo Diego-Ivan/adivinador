@@ -4,6 +4,7 @@ adivinador_sources = [
   'Textura.c',
   'Recursos.c',
   'Juego.c',
+  'Unicode.c',
 ]
 
 adivinador_deps = [
