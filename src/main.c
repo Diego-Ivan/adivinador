@@ -23,6 +23,15 @@ int main(int argc,
   juego_registrar_categoria(juego,
                             categoria_nueva_desde_archivo("Animales",
                                                           "recursos/animales.txt"));
+  juego_registrar_categoria(juego,
+                            categoria_nueva_desde_archivo("Frutas",
+                                                          "recursos/frutas.txt"));
+  juego_registrar_categoria(juego,
+                            categoria_nueva_desde_archivo("Países",
+                                                          "recursos/paises.txt"));
+  juego_registrar_categoria(juego,
+                            categoria_nueva_desde_archivo("Estados de México",
+                                                          "recursos/estados.txt"));
   juego_iniciar_bucle (juego);
   juego_liberar(juego);
   return EXIT_SUCCESS;
