@@ -1,6 +1,6 @@
 adivinador_sources = [
   'main.c',
-  'Categoria.c',
+  # 'Categoria.c',
   'Textura.c',
   'Recursos.c',
   # 'Juego.c',

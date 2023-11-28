@@ -6,7 +6,6 @@
  */
 
 #include "Textura.h"
-#include "Categoria.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,7 +16,7 @@
 #define EXIT_FAILURE 1
 
 #define MAX_CATEGORIAS 10
-#define DEFAULT_VIDAS 4
+#define DEFAULT_VIDAS 5
 
 #define clear_pantalla() system("clear")
 
@@ -35,6 +34,22 @@ char *u8_construir_primer_caracter(const char *, size_t *);
 const char *u8_get_caracter_equivalente_minuscula(const char *, size_t *);
 const char *u8_get_caracter_equivalente_mayuscula(const char *, size_t *);
 const char *u8_get_ascii_equivalente(const char *);
+
+/* Inician declaraciones de las categorias */
+struct __Categoria;
+typedef struct __Categoria Categoria;
+
+Categoria *categoria_nueva(const char *nombre);
+Categoria *categoria_nueva_desde_archivo(const char *, const char *);
+const char *categoria_get_nombre(Categoria *);
+void categoria_registrar_palabra(Categoria *, const char *, int);
+const char *categoria_get_palabra(Categoria *, unsigned int);
+int categoria_get_n_palabras(Categoria *);
+void categoria_destruir(Categoria *);
+
+/* Terminan declaraciones de las categorías */
+
+/* Inician declaraciones del juego */
 
 /**
  * Enumeración que define los tipos de intento que puede realizar el usuario
@@ -68,6 +83,8 @@ void juego_imprimir_palabra_adivinada (void);
 bool juego_revelar_caracter(const char *, size_t, bool);
 void juego_iniciar_adivinanzas(void);
 
+/* Terminan declaraciones del juego */
+
 int main(int argc,
          char **argv)
 {
@@ -77,6 +94,7 @@ int main(int argc,
   return EXIT_SUCCESS;
 }
 
+/* Inicia código del juego */
 void inicializar (void)
 {
   n_categorias = 0;
@@ -265,7 +283,7 @@ void juego_iniciar_adivinanzas(void)
       scanf(" %99[^\n]", str);
 
       adivinado = strcasecmp (palabra_actual, str) == 0;
-      if (adivinado) {
+      if (!adivinado) {
         vidas--;
       }
       break;
@@ -485,4 +503,213 @@ void juego_finalizar(void)
   if (victoria_textura != NULL) {
     textura_liberar(victoria_textura);
   }
+}
+
+/* Termina código del juego, inicia código de las categorías */
+
+/**
+ * Este será el tamaño que tendrá el arreglo de palabras. Lo haremos un número
+ * relativamente grande, porque si no tendríamos que realojar muchas veces,
+ * y eso es una operación muy cara. Mejor nos ahorramos eso aunque tengamos
+ * un poquillo de overhead.
+ */
+#define DEFAULT_N_PALABRAS 32
+
+struct __Categoria {
+  char *nombre;
+  char **palabras;
+  size_t n_palabras;
+  size_t buffer_size;
+};
+
+void categoria_realloc(Categoria *);
+
+/**
+ * Función que crea una nueva categoría de nombre @nombre
+ *
+ * @nombre El nombre de la categoría
+ *
+ * Returns: una categoría nueva
+ */
+Categoria *categoria_nueva(const char *nombre)
+{
+  Categoria *nueva;
+  if (nombre == NULL) {
+    return NULL;
+  }
+
+  nueva = malloc(sizeof(Categoria));
+  nueva->nombre = strdup (nombre);
+
+  nueva->palabras = calloc(DEFAULT_N_PALABRAS, sizeof(char *));
+  nueva->n_palabras = 0;
+  nueva->buffer_size = DEFAULT_N_PALABRAS;
+
+  return nueva;
+}
+
+/**
+ * Función que crea una nueva categoría de nombre @nombre a partir de las
+ * palabras de @archivo
+
+ * @nombre El nombre de la categoría
+ *
+ * @archivo El camino al archivo
+ *
+ * Returns: una categoría nueva
+ */
+Categoria *categoria_nueva_desde_archivo(const char *nombre,
+                                         const char *archivo)
+{
+  Categoria *nueva = NULL;
+  char *palabra = NULL;
+  long caracteres;
+  size_t palabra_size;
+  FILE *stream;
+
+  if (nombre == NULL) {
+    return NULL;
+  }
+  if (archivo == NULL) {
+    return NULL;
+  }
+
+  stream = fopen(archivo, "r");
+
+  if (stream == NULL) {
+    printf ("No se pudo abrir el archivo %s para la categoría %s\n",
+            nombre, archivo);
+    return NULL;
+  }
+  nueva = categoria_nueva(nombre);
+
+  while ((caracteres = getline(&palabra, &palabra_size, stream)) != -1) {
+    // si el último caracter antes del nulo es \n, hay que quitarlo para
+    // sanitizar la palabra y que nos sirva para el juego lets gooo
+    if (palabra[caracteres - 1] == '\n') {
+      palabra[caracteres - 1] = 0;
+    }
+    categoria_registrar_palabra(nueva, palabra, palabra_size);
+  }
+
+  fclose(stream);
+  free(palabra);
+
+  return nueva;
+}
+
+/**
+ * Registra @palabra en @self
+ *
+ * @self La categoría
+ *
+ * @palabra La palabra a registrar
+ *
+ * @palabra_size La longitud de la palabra, o -1 si @palabra termina en NUL
+ */
+void categoria_registrar_palabra(Categoria *self, const char *palabra,
+                                 int palabra_size)
+{
+  char *copia_palabra;
+  if (self == NULL) {
+    return;
+  }
+  if (palabra == NULL) {
+    return;
+  }
+
+  if (self->n_palabras >= self->buffer_size) {
+    categoria_realloc(self);
+  }
+
+  if (palabra_size < 0) {
+    palabra_size = strlen(palabra);
+  }
+
+  copia_palabra = calloc(palabra_size, sizeof(char));
+  strcpy(copia_palabra, palabra);
+
+  self->palabras[self->n_palabras] = copia_palabra;
+  self->n_palabras++;
+}
+
+/**
+ * Añade espacios al arreglo interno para que puedan haber más palabras
+ */
+void categoria_realloc(Categoria *self) {
+  char **anterior, **nuevo;
+  size_t anterior_size, nuevo_size;
+  if (self == NULL) {
+    return;
+  }
+
+  anterior = self->palabras;
+  anterior_size = self->buffer_size;
+  nuevo_size = anterior_size + DEFAULT_N_PALABRAS;
+
+  nuevo = calloc(nuevo_size, sizeof(char *));
+  for (size_t i = 0; i < anterior_size; i++) {
+    nuevo[i] = anterior[i];
+  }
+
+  self->palabras = nuevo;
+  self->buffer_size = nuevo_size;
+
+  free(anterior);
+}
+
+/**
+ * Obtiene la palabra @indice dentro de @self
+ *
+ * @self La categoría
+ *
+ * @indice El índice de la palabra
+ *
+ * Returns: (transfer: None) La palabra @indice de @self ó -1 si @indice no es válido
+ */
+const char *categoria_get_palabra(Categoria *self, unsigned int indice) {
+  if (self == NULL) {
+    return NULL;
+  }
+  return self->palabras[indice];
+}
+
+/**
+ * Obtiene el número de palabras de @self
+ *
+ * @self La categoría
+ *
+ * Returns: El numero de palabras en @self ó -1 si @self es NULL
+ */
+int categoria_get_n_palabras(Categoria *self) {
+  if (self == NULL) {
+    return -1;
+  }
+  return self->n_palabras;
+}
+
+/**
+ * Obteiene el nombre de @self
+ *
+ * @self La categoría
+ *
+ * Returns: (transfer: none) El nombre de @self
+ */
+const char *categoria_get_nombre(Categoria *self) {
+  if (self == NULL) {
+    return NULL;
+  }
+  return self->nombre;
+}
+
+void categoria_destruir(Categoria *self) {
+  if (self == NULL) {
+    return;
+  }
+  for (size_t i = 0; i < self->n_palabras; i++) {
+    free(self->palabras[i]);
+  }
+  free(self->palabras);
+  free(self->nombre);
+  free(self);
 }
