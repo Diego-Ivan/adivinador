@@ -1,6 +1,8 @@
 /* main.c
  *
- * Copyright 2023 Diego Iván <diegoivan.mae@gmail.com>
+ * Copyright 2023 Diego Iván M.E
+ * Copyright 2023 Juan Pablo Alquicer
+ * Copyright 2023 Mariana García
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -248,7 +250,7 @@ void juego_elegir_palabra(void)
 
   /*
    * Vamos a hacer copias de las palabras que seleccionemos aleatoriamente,
-   * como estas están alojadas en el heap, tenemos que liberarlas cuando ya
+   * como  están alojadas en el heap, tenemos que liberarlas cuando ya
    * no las necesitamos.
    */
   if (palabra_actual != NULL) {
@@ -319,6 +321,7 @@ void juego_iniciar_adivinanzas(void)
        */
       primer_caracter = u8_construir_primer_caracter (str, &c_len);
 
+      // Usamos strcasecmp para ignorar si es mayuscula o minuscula
       if (juego_revelar_caracter (primer_caracter, c_len, false)) {
         adivinado = strcasecmp (palabra_actual,
                                       palabra_adivinada) == 0;
@@ -382,6 +385,15 @@ void juego_imprimir_palabra_adivinada (void)
   for (size_t i = 0; i < palabra_len; i++) {
     char c_adivinado = palabra_adivinada[i];
     char c_actual = palabra_actual[i];
+    /*
+     * Solo vamos a imprimir el caracter si cumple con alguna de las siguientes
+     * condiciones:
+     *
+     * 1. Si el caracter de la palabra actual es el primer byte de una
+     * cadena UTF-8
+     * 2. Si el caracter de la palabra actual es un caracter ASCII
+     * 3. Si el caracter de la cadena a adivinar ya fue revelado
+     */
     if ((PRIMER_U8 (c_actual) || ES_ASCII(c_actual)) || PARTE_U8 (c_adivinado)) {
       putchar (c_adivinado);
     }
@@ -400,10 +412,13 @@ TipoIntento juego_solicitar_tipo_intento(void)
   for (;;)
   {
     printf ("Ingrese el tipo de intento que quiere realizar:\n");
+    /* Iteramos sobre los tipos de intento válidos y los imprimimos */
     for (TipoIntento tipo = TIPO_0 + 1; tipo < N_TIPOS; tipo++) {
       printf ("%d. %s\n", tipo, tipo_intento_to_string (tipo));
     }
     scanf ("%d", &seleccion);
+    // Si el índice seleccionado por el usuario es válido, salimos para
+    // devolverlo
     if (seleccion > TIPO_0 && seleccion < N_TIPOS)
       break;
     printf ("Opción Inválida!\n");
@@ -447,15 +462,46 @@ bool juego_revelar_caracter(const char *u8_c,
   size_t alt_len;
   const char *alt;
 
+  /*
+   * Nota importante:
+   * En esta función no podemos iterar caracter por caracter,
+   * recordemos que aquí las cadenas pueden tener caracteres especiales más
+   * allá de los ASCII, y estos caracteres ocupan mas de un espacio en una
+   * cadena de caracteres, entonces vamos a comparar secciones de cadenas que
+   * puedan contener los caracteres
+   *
+   * Por eso como parametros pedimos una cadena de caracteres en vez de un
+   * solo caracter, además de la longitud de la cadena para saber cuantos
+   * espacio debemos de comparar
+   */
+
   for (size_t i = 0; i < palabra_len; i++)
   {
     // Significa que el caracter ya fue adivinado
+    // strncasecmp nos ayuda a comparar cierta cantidad de caracteres entre
+    // dos cadenas
+
+    /*
+     * Aquí vamos a usar unos cuantos trucos de las cadenas de caracteres en C.
+     * Las cadenas de caracteres técnicamente son solo punteros, y las funciones
+     * que leen cadenas de caracteres leen desde la direccion de memoria a la
+     * que el puntero apunta hasta que encuentran un 0 (el caracter nulo).
+     *
+     * Aplicando esta lógica, podemos hacer que una función solo lea desde una
+     * posicion deseada en la cadena de caracteres. Para hacerlo, tenemos
+     * que pasarle la direccion de memoria (osea, un puntero, y por tanto una
+     * cadena) del caracter que esta en el indice en el que queremos que empiece:
+     *
+     * &mi_cadena[indice]
+     *
+     * El operador & da la direccion de memoria de la expresión que lo sigue.
+     */
     if (strncasecmp (&palabra_adivinada[i], u8_c, c_len) == 0)
     {
       valido = false;
       break;
     }
-    // u8_c está en el string
+    // El caracter que se pasó como parametro si está en la cadena
     if (strncasecmp (&palabra_actual[i], u8_c, c_len) == 0)
     {
       strncpy (&palabra_adivinada[i], &palabra_actual[i], c_len);
@@ -465,6 +511,9 @@ bool juego_revelar_caracter(const char *u8_c,
 
   // Vamos a revelar los caracteres equivalentes, como caracteres cono acento/
   // sin acento, Ñ...
+  // Aquí no tenemos de otra más que hacer la función recursiva. Solo no
+  // ejecutaremos esta parte de la función cuando especifiquemos que estamos
+  // revisando caracteres equivalentes
   if (!es_alt)
   {
     alt = u8_get_caracter_equivalente_minuscula (u8_c, &alt_len);
@@ -932,6 +981,8 @@ void textura_agregar_linea(Textura *self,
     return;
   }
   if (self->altura >= self->buffer_size) {
+    // Signfica que ya hemos superado el espacio que tenemos reservado, alojamos
+    // más
     textura_realloc(self);
   }
   self->datos[self->altura] = strdup (linea);
@@ -994,6 +1045,20 @@ int char_minuscula(int c)
  */
 char *u8_construir_primer_caracter(const char *str, size_t *charlen)
 {
+  /*
+   * Los caracteres codificados en UTF-8 tienen unas caracteristicas particulares
+   * que nos pueden ayudar a identificarlos.
+   *
+   * 1. Los dos bits más significantes del primer byte de un caracter UTF-8
+   * son 11. Podemos saber si en un byte sus primeros dos bits son 11
+   * con la siguiente operacion: (byte & 0xC0) == 0xC0. Esta operacion está
+   * implementada en la macro PRIMER_U8
+   *
+   * 2. Los dos bits más significativos de los demás bytes de un caracter UTF-8
+   * son 10. Podemos saber si en un byte sus primeros dos bits son 10 con la
+   * operacion (byte & 0xC0) == 0x80, esta operación está implementada
+   * en la macro PARTE_U8
+   */
   char *retval = NULL;
   bool inicio_u8 = 0;
   if (str == NULL) {
@@ -1004,7 +1069,12 @@ char *u8_construir_primer_caracter(const char *str, size_t *charlen)
   }
 
   *charlen = 0;
+  // Alojamos memoria en para el caracter de retorno
   retval = calloc (strlen (str), sizeof (char));
+
+  /*
+   * Si el primer caracter de la cadena es ASCII, lo retornamos
+   */
   if (ES_ASCII (str[0]))
   {
     retval[0] = str[0];
@@ -1012,22 +1082,38 @@ char *u8_construir_primer_caracter(const char *str, size_t *charlen)
     return retval;
   }
 
+  /* Si no, vamos a iterar sobre la cadena para armar el caracter que queremos */
   for (; str[*charlen] != 0; (*charlen)++)
   {
     char c = str[*charlen];
     if (PRIMER_U8 (c))
     {
+      /*
+       * Si el caracter en el que estamos es el primer byte de un caracter
+       * UTF-8, pero ya habíamos encontrado uno antes, significa que ya
+       * estamos empezando a leer otro caracter. Salimos del bucle
+       */
       if (inicio_u8) {
         break;
       }
+      /*
+       * Si no, signifca qu es el primer byte de un caracter uTF-8 que nos
+       * encontramos, así que lo asignamos al valor de retorno y continuamos
+       */
       inicio_u8 = true;
       retval[*charlen] = c;
       continue;
     }
+    /*
+     * Si el caracter que nos encontramos es un byte de un caracter U8,
+     * lo añadimos
+     */
     if (PARTE_U8 (c) && inicio_u8) {
       retval[*charlen] = c;
       continue;
     }
+
+    /* Si es ASCII, significa que ya estamos leyendo otro caracter, salimos */
     if (ES_ASCII (c)) {
       if (inicio_u8) break;
       retval[*charlen] = c;
