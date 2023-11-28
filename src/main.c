@@ -5,7 +5,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "Textura.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,6 +19,7 @@
 
 #define clear_pantalla() system("clear")
 
+/* Inician declaraciones para funciones UTF-8 */
 /*
  * Nos ayudará a reconocer caracteres codificados en UTF-8 en vez de ASCII
  *
@@ -34,8 +34,13 @@ char *u8_construir_primer_caracter(const char *, size_t *);
 const char *u8_get_caracter_equivalente_minuscula(const char *, size_t *);
 const char *u8_get_caracter_equivalente_mayuscula(const char *, size_t *);
 const char *u8_get_ascii_equivalente(const char *);
+/* Terminan declaraciones para funciones UTF-8 */
 
 /* Inician declaraciones de las categorias */
+/*
+ * Vamos a crear una estructura opaca para que no se puedan modificar
+ * los campos de la categoría más que dentro del mismo código de la categoría
+ */
 struct __Categoria;
 typedef struct __Categoria Categoria;
 
@@ -48,6 +53,19 @@ int categoria_get_n_palabras(Categoria *);
 void categoria_destruir(Categoria *);
 
 /* Terminan declaraciones de las categorías */
+
+/* Inician declaraciones de las texturas */
+struct __Textura;
+typedef struct __Textura Textura;
+
+Textura *textura_nueva_desde_archivo(const char *);
+int textura_get_rowstride(Textura *);
+int textura_get_altura(Textura *);
+const char *textura_get_linea(Textura *, size_t);
+void textura_imprimir_linea (Textura *, size_t);
+void textura_imprimir(Textura *);
+void textura_liberar(Textura *);
+/* Terminan las declaraciones de las texturas */
 
 /* Inician declaraciones del juego */
 
@@ -712,4 +730,492 @@ void categoria_destruir(Categoria *self) {
   free(self->palabras);
   free(self->nombre);
   free(self);
+}
+
+/* Termina código de las categorías */
+/* Inicia código de las texturas */
+
+#define BUFFER_DEFAULT 20
+
+/**
+ * Una textura es una estructura que representa a una imagen creada a partir de
+ * caracteres ASCII
+ */
+struct __Textura {
+  size_t rowstride;
+  size_t altura;
+  char   **datos;
+  size_t buffer_size;
+};
+
+void textura_realloc(Textura *);
+void textura_imprimir_linea_unsafe(Textura *, size_t);
+void textura_agregar_linea(Textura *, const char *);
+
+/**
+ * Aloja espacio para más lineas en @self
+ *
+ * @self - La instancia a la que se le quiere alojar más espacio
+ */
+void textura_realloc(Textura *self)
+{
+  size_t nuevo_buffer_size;
+  char **nuevo;
+  if (self == NULL) {
+    return;
+  }
+  nuevo_buffer_size = self->buffer_size + BUFFER_DEFAULT;
+  nuevo = calloc(nuevo_buffer_size, sizeof(char *));
+
+  for (size_t i = 0; i < self->altura; i++) {
+    nuevo[i] = self->datos[i];
+  }
+  free(self->datos);
+  self->datos = nuevo;
+  self->buffer_size = nuevo_buffer_size;
+}
+
+/**
+ * Crea una textura nueva a partir de @camino, un archivo de texto plano
+ * válido
+ *
+ * @camino Un camino válido a un archivo de texto plano válido
+ *
+ * Returns: La nueva textura creada a partir del archivo, o NULL en caso de
+ * haber fallado
+ */
+Textura *textura_nueva_desde_archivo(const char *camino)
+{
+  FILE *stream = NULL;
+  char *linea = NULL;
+  size_t caracteres = 0, size = 0;
+  Textura *self = NULL;
+
+  if (camino == NULL) {
+    return NULL;
+  }
+
+  stream = fopen(camino, "r");
+  if (stream == NULL) {
+    printf ("No se pudo abrir el archivo %s para crear una textura", camino);
+  }
+
+  self = malloc(sizeof(Textura));
+  self->altura = 0;
+  self->rowstride = 0;
+  self->buffer_size = BUFFER_DEFAULT;
+  self->datos = calloc(BUFFER_DEFAULT, sizeof(char *));
+
+  while ((caracteres = getline(&linea, &size, stream)) != -1)
+  {
+    if (caracteres > self->rowstride) {
+      self->rowstride = caracteres;
+    }
+
+    if (caracteres > 0 && linea[caracteres - 1] == '\n') {
+      linea[caracteres - 1] = 0;
+    }
+    textura_agregar_linea(self, linea);
+  }
+  free (linea);
+  fclose (stream);
+
+  return self;
+}
+
+/**
+ * Retorna el número de caracteres de @self por linea
+ *
+ * @self La instancia de una textura
+ *
+ * Returns: El numero de caracteres por linea de @self
+ */
+int textura_get_rowstride(Textura *self)
+{
+  if (self == NULL) {
+    return -1;
+  }
+  return self->rowstride;
+}
+
+/**
+ * Retorna la altura de @self
+ *
+ * @self La instancia de una textura
+ *
+ * Returns: La altura de @self
+ */
+int textura_get_altura(Textura *self)
+{
+  if (self == NULL) {
+    return -1;
+  }
+  return self->altura;
+}
+
+/**
+ * Retorna la linea numero @indice de @self
+ *
+ * @self La instancia de una textura
+ * @indice La posicion de la linea que se quiere obtener
+ *
+ * Returns: La linea @indice de @self o NULL en caso de @indice invalido
+ */
+const char *textura_get_linea(Textura *self,
+                              size_t indice)
+{
+  if (self == NULL) {
+    return NULL;
+  }
+  if (indice >= self->altura) {
+    printf ("Índice %lu no válido!\n", indice);
+    return NULL;
+  }
+  return self->datos[indice];
+}
+
+/**
+ * Imprime la linea numero @indice de @self
+ *
+ * @self La instancia de una textura
+ * @indice La posicion de la linea que se quiere imprimir
+ */
+void textura_imprimir_linea(Textura *self,
+                            size_t   indice)
+{
+  if (self == NULL) {
+    return;
+  }
+  if (indice >= self->altura) {
+    printf ("Índice %lu no válido!\n", indice);
+    return;
+  }
+  textura_imprimir_linea_unsafe(self, indice);
+}
+
+void textura_imprimir_linea_unsafe(Textura *self,
+                                   size_t   indice)
+{
+  size_t i = 0;
+  for (; self->datos[indice][i] != '\0'; i++) {
+    putchar(self->datos[indice][i]);
+  }
+  for (; i < self->rowstride; i++) {
+    putchar(' ');
+  }
+}
+
+/**
+ * Imprime la imagen contenida en @self
+ *
+ * @self - La instancia que se desea imprimir
+ */
+void textura_imprimir(Textura *self)
+{
+  size_t fila = 0;
+  if (self == NULL) {
+    return;
+  }
+  for (; fila < self->altura; fila++) {
+    textura_imprimir_linea_unsafe(self, fila);
+    putchar('\n');
+  }
+}
+
+void textura_agregar_linea(Textura *self,
+                           const char *linea)
+{
+  if (self == NULL) {
+    return;
+  }
+  if (linea == NULL) {
+    return;
+  }
+  if (self->altura >= self->buffer_size) {
+    textura_realloc(self);
+  }
+  self->datos[self->altura] = strdup (linea);
+  self->altura++;
+}
+
+/**
+ * Libera la información contenida en @self
+ *
+ * @self La instancia que se quiera liberar
+ */
+void textura_liberar(Textura *self)
+{
+  if (self == NULL) {
+    return;
+  }
+  for (size_t i = 0; i < self->altura; i++) {
+    free(self->datos[i]);
+  }
+  free(self->datos);
+  free(self);
+}
+
+/* Termina código de las texturas */
+
+/* Inicia código de las funciones UTF-8 */
+/**
+ * Retorna la minuscula de @c
+ *
+ * @c - El caracter que se quiere convertir a minusculas
+ *
+ * Returns: La minuscula de @c, si es que tiene
+ */
+int char_minuscula(int c)
+{
+  if (c >= 65 && c <= 90) {
+    return c + 32;
+  }
+  return c;
+}
+
+/**
+ * Obtiene el primer caracter en codificación UTF-8 de @str.
+ *
+ * Esta función es necesaria para poder implementar adivinanzas de caracteres
+ * UTF-8, como letras acentudas o la ñ.
+ *
+ * Se utilizó https://dev.to/rdentato/utf-8-strings-in-c-1-3-42a4 como recurso
+ * principal para implementar la función.
+ *
+ * Esta función NO hace validación de ningún tipo, solo retorna el primer
+ * caracter, por lo que se espera que @str sea válido desde un inicio
+ *
+ * @str La cadena de la que se quiere obtener el caracter. Debe ser UTF-8 valida
+ *
+ * @charlen Una dirección de memoria válida a una variable size_t para
+ * almacenar la longitud del primer caracter
+ *
+ * Returns: (transfer: ownership) El primer caracter UTF-8 de @str
+ */
+char *u8_construir_primer_caracter(const char *str, size_t *charlen)
+{
+  char *retval = NULL;
+  bool inicio_u8 = 0;
+  if (str == NULL) {
+    return NULL;
+  }
+  if (charlen == NULL) {
+    return NULL;
+  }
+
+  *charlen = 0;
+  retval = calloc (strlen (str), sizeof (char));
+  if (ES_ASCII (str[0]))
+  {
+    retval[0] = str[0];
+    *charlen = 1;
+    return retval;
+  }
+
+  for (; str[*charlen] != 0; (*charlen)++)
+  {
+    char c = str[*charlen];
+    if (PRIMER_U8 (c))
+    {
+      if (inicio_u8) {
+        break;
+      }
+      inicio_u8 = true;
+      retval[*charlen] = c;
+      continue;
+    }
+    if (PARTE_U8 (c) && inicio_u8) {
+      retval[*charlen] = c;
+      continue;
+    }
+    if (ES_ASCII (c)) {
+      if (inicio_u8) break;
+      retval[*charlen] = c;
+      break;
+    }
+  }
+
+  return retval;
+}
+
+/**
+ * Retorna el caracter minúscula equivalente de @c, o NULL en caso de que no
+ * tenga
+ *
+ * @c El caracter del cual se quiere obtener la minuscula
+ *
+ * @size Una direccion de memoria valida para almacenar la longitud de @c del
+ * caracter equivalente
+ *
+ * Returns: (transfer: none) La minuscula de @c o NULL, en caso de que no tenga
+ */
+const char *u8_get_caracter_equivalente_minuscula(const char *c,
+                                                  size_t     *size)
+{
+  const char *retval = NULL;
+  if (c == NULL) {
+    return NULL;
+  }
+  if (size == NULL) {
+    return NULL;
+  }
+
+  if (ES_ASCII (c[0]))
+  {
+    switch (char_minuscula (c[0]))
+    {
+    case 'a':
+      retval = "á";
+      break;
+    case 'e':
+      retval = "é";
+      break;
+    case 'i':
+      retval = "í";
+      break;
+    case 'o':
+      retval = "ó";
+      break;
+    case 'u':
+      retval = "ú";
+      break;
+    default:
+      break;
+    }
+  }
+  else
+  {
+    if (strcmp (c, "Á") == 0) {
+      retval = "á";
+    }
+    if (strcmp (c, "É") == 0) {
+      retval = "é";
+    }
+    if (strcmp (c, "Í") == 0) {
+      retval = "í";
+    }
+    if (strcmp (c, "Ó") == 0) {
+      retval = "ó";
+    }
+    if (strcmp (c, "Ú") == 0) {
+      retval = "ú";
+    }
+    if (strcmp (c, "Ñ") == 0) {
+      retval = "ñ";
+    }
+  }
+  if (retval != NULL) {
+    *size = strlen (retval);
+  } else {
+    *size = 0;
+  }
+  return retval;
+}
+
+/**
+ * Retorna el caracter mayúscula equivalente de @c, o NULL en caso de que no
+ * tenga
+ *
+ * @c El caracter del cual se quiere obtener la mayúscula
+ *
+ * @size Una direccion de memoria valida para almacenar la longitud del caracter
+ * equivalente
+ *
+ * Returns: (transfer: none) La mayúscula de @c o NULL, en caso de que no tenga
+ */
+const char *u8_get_caracter_equivalente_mayuscula(const char *c,
+                                                  size_t     *size)
+{
+  const char *retval = NULL;
+  if (c == NULL) {
+    return NULL;
+  }
+  if (size == NULL) {
+    return NULL;
+  }
+
+  if (ES_ASCII (c[0]))
+  {
+    switch (char_minuscula (c[0]))
+    {
+    case 'a':
+      retval = "Á";
+      break;
+    case 'e':
+      retval = "É";
+      break;
+    case 'i':
+      retval = "Í";
+      break;
+    case 'o':
+      retval = "Ó";
+      break;
+    case 'u':
+      retval = "Ú";
+      break;
+    default:
+      break;
+    }
+  }
+  else
+  {
+    if (strcmp (c, "a") == 0) {
+      retval = "Á";
+    }
+    if (strcmp (c, "e") == 0) {
+      retval = "É";
+    }
+    if (strcmp (c, "i") == 0) {
+      retval = "Í";
+    }
+    if (strcmp (c, "o") == 0) {
+      retval = "Ó";
+    }
+    if (strcmp (c, "u") == 0) {
+      retval = "Ú";
+    }
+    if (strcmp (c, "ñ") == 0) {
+      retval = "Ñ";
+    }
+  }
+  if (retval != NULL) {
+    *size = strlen (retval);
+  } else {
+    *size = 0;
+  }
+  return retval;
+}
+
+/**
+ * Retorna el caracter ASCII equivalente de @c
+ *
+ * @c El caracter del cual se quiere obtener el ASCII equivalente
+ *
+ * Returns: (transfer: none) El ASCII equivalente de @c, o NULL, en caso de que
+ * no tenga
+ */
+const char *u8_get_ascii_equivalente(const char *c)
+{
+  const char *retval = NULL;
+  if (c == NULL) {
+    return NULL;
+  }
+
+  if (strcmp (c, "á") == 0 || strcmp (c, "Á") == 0) {
+    retval = "a";
+  }
+  if (strcmp (c, "é") == 0 || strcmp (c, "É") == 0) {
+    retval = "e";
+  }
+  if (strcmp (c, "í") == 0 || strcmp (c, "Í") == 0) {
+    retval = "i";
+  }
+  if (strcmp (c, "ó") == 0 || strcmp (c, "Ó") == 0) {
+    retval = "o";
+  }
+  if (strcmp (c, "ú") == 0 || strcmp (c, "Ú") == 0) {
+    retval = "u";
+  }
+
+  return retval;
 }
